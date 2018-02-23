@@ -24,7 +24,7 @@ Take the `mtcars` data set and write up an analysis to answer their question usi
 
 # Author's note
 
-Since we're doing many significance tests in this study, we have to correct for this. in order to avoid getting p-values by pure lucK. Since we estimate the number of significance tests in the study to be of the order of 10, the Bonferroni correction tells us to look for p-values under 0.005.
+Since we're doing many significance tests in this study, we have to correct for this. in order to avoid getting p-values by pure luck. Since we estimate the number of significance tests in the study to be of the order of 10, the Bonferroni correction tells us to look for p-values under 0.005.
 
 # Exploratory analysis
 
@@ -60,14 +60,14 @@ Fitting a first model we find that the average value of `mpg` is `r round(coef(f
 
 As our first model is not satisfying, we will search for other significant variables in the modelling of `mpg`. We start with a model including all variables and use the AIC (Akaike information criterion) to eliminate variables down to a better model.
 
-```{r model_selection, include = FALSE}
+```{r model_selection}
 fit_all <- lm(mpg ~.,data=mtcars_fac)
-fit_step <- step(fit_all)
+fit_step <- step(fit_all, trace = 0)
 ```
 
 This new model is not fully satisfying, however. The p-values for the `cyl8` coefficient is `r round(summary(fit_step)$coef[3,4],2)`, which is far from enough to attest for its significance. The p-value for the `am` coefficient is `r round(summary(fit_step)$coef[6,4],2)` which is not good enough either.
 
-Since these coeffcients are not significative, let us fit two models, each with one of these variable dropped. We also fit a model where we drop both `cyl` and `am` variable and compare them to our previous model.
+Since these coefficients are not significative, let us fit two models, each with one of these variable dropped. We also fit a model where we drop both the `cyl` and `am` variables and compare these models to our previous one.
 
 ```{r noam}
 fit_no_am <- lm(mpg ~ wt + hp + cyl, mtcars_fac)
