@@ -1,0 +1,161 @@
+---
+title: 'Regression Models Final Assignment : mtcars analysis'
+author: "Alnour Ribault"
+date: "22 février 2018"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+library(ggplot2)
+```
+# Introduction
+This document is my submission for the final assignment of the Regression Models course from the Coursera Data Science specialization by the John Hopkins University.
+
+# Instructions
+
+You work for Motor Trend, a magazine about the automobile industry. Looking at a data set of a collection of cars, they are interested in exploring the relationship between a set of variables and miles per gallon (MPG) (outcome). They are particularly interested in the following two questions:
+
+* "Is an automatic or manual transmission better for MPG"
+* "Quantify the MPG difference between automatic and manual transmissions"
+
+Take the `mtcars` data set and write up an analysis to answer their question using regression models and exploratory data analyses.
+
+# Author's note
+
+Since we're doing many significance tests in this study, we have to correct for this. in order to avoid getting p-values by pure lucK. Since we estimate the number of significance tests in the study to be of the order of 10, the Bonferroni correction tells us to look for p-values under 0.005.
+
+# Exploratory analysis
+
+We first get a grip of the data by using basic R commands.
+
+```{r basics, include=FALSE}
+head(mtcars)
+str(mtcars)
+summary(mtcars)
+```
+It appears that some of the variables are naturally discrete. We thus convert them to factor variables.
+
+```{r to_factor}
+mtcars_fac <- mutate(mtcars, cyl = factor(cyl), 
+                     vs = factor(vs, labels = c("V engine", "Straigth engine")),
+                     am = factor(am, labels = c("Automatic", "Manual")), 
+                     gear = factor(gear), 
+                     carb = factor(carb))
+```
+
+We then plot a pair graph of the original `mtcars` data to get a grip of the correlation between the variables. `mpg` seems to decrease when `cyl`, `disp`, `hp`, `wt` increase, and seems to be higher among V engines than among Straigth engines, and higher among automatic transmission cars than among manual transmission cars as well.  
+Some of those relations make sense : a heavier car will naturally use more gas, and a car designer will have to sacrifice some efficiency in order to achieve higher horsepower. The others, however, are more obscure.
+
+Since we are especially interested in the relationship between variables `mpg` and `am`, we plot a boxplot of the value of `mpg` for automatic and manual transmission. It appears that cars with manual transmission have a notably higher mpg than those with automatic transmission. 
+
+```{r firstFit}
+fit <- lm(mpg ~ am, mtcars_fac)
+```
+
+Fitting a first model we find that the average value of `mpg` is `r round(coef(fit)[1],2)` for automatic cars and `r round(coef(fit)[2],2)` for manual cars. Both p-values are low enough for us to reject the null hypothesis that the actual coefficients are zero. However, the model's R-squared is only `r round(summary(fit)$r.squared,2)` which is not satisfying. We thus have to try adding other variables in order to explain `mpg`'s variance.
+
+# Model Selection
+
+As our first model is not satisfying, we will search for other significant variables in the modelling of `mpg`. We start with a model including all variables and use the AIC (Akaike information criterion) to eliminate variables down to a better model.
+
+```{r model_selection, include = FALSE}
+fit_all <- lm(mpg ~.,data=mtcars_fac)
+fit_step <- step(fit_all)
+```
+
+This new model is not fully satisfying, however. The p-values for the `cyl8` coefficient is `r round(summary(fit_step)$coef[3,4],2)`, which is far from enough to attest for its significance. The p-value for the `am` coefficient is `r round(summary(fit_step)$coef[6,4],2)` which is not good enough either.
+
+Since these coeffcients are not significative, let us fit two models, each with one of these variable dropped. We also fit a model where we drop both `cyl` and `am` variable and compare them to our previous model.
+
+```{r noam}
+fit_no_am <- lm(mpg ~ wt + hp + cyl, mtcars_fac)
+fit_no_cyl <- lm(mpg ~ wt + hp + am, mtcars_fac)
+fit_no_am_no_cyl <- lm(mpg ~ wt + hp, mtcars_fac)
+anova(fit_step, fit_no_am)
+anova(fit_step, fit_no_cyl)
+anova(fit_step, fit_no_am_no_cyl)
+```
+
+The model without either `am` or `cyl` seems to be the only one improving on the previous one. It seems to be a pretty satisfying model since the p-values are better than previously, being under our Bonferroni threshold of 0.005!  
+So the two remaining variables are horsepower and weight. But those two seem intuitively related : cars that have higher horsepower will be heavier. We thus try correcting for the interaction between the two variables.
+
+```{r fina_fit}
+fit_final <- lm(mpg ~ wt + hp + wt*hp, mtcars_fac)
+anova(fit_no_am_no_cyl, fit_final)
+```
+
+The improvement obtained by adding the interaction term seems like a good idea. This model actually explains *almost* as much variance (R-squared = `r round(summary(fit_final)$r.squared,2)`) than the model containing all the variables (R-squared = `r round(summary(fit_all)$r.squared,2)`) which many less variables, *and* this time the coefficients of all the terms are highly significant.
+
+# Residuals
+
+We observe no particular pattern in the various plots of the residuals, and they seem to be normally distributed : our model presents no obvious weakness.
+
+# Conclusion
+
+Our study showed that, if the mtcars sample is representative, the transmission mode does not have a significant influence on the MPG, which is mainly explained by weight and horsepower. Therefore, the interaction between the transmission mode and the MPG is not quantifiable : the difference in MPG between the automatic cars and the manual cars is explained by their weight and horsepower. 
+
+\pagebreak
+
+# Appendices
+
+## mtcars data
+
+```{r basics_display, echo = FALSE}
+head(mtcars)
+str(mtcars)
+summary(mtcars)
+```
+
+## Pair graph
+
+```{r pairs}
+pairs(mtcars, panel=panel.smooth, main="Pair graph for mtcars data")
+```
+
+## Boxplot
+
+```{r boxplot}
+
+g <- ggplot(mtcars_fac, aes(am, mpg)) +
+    geom_boxplot(aes(fill = am)) +
+    labs(title = "Value of mpg for automatic and manual transmissions", 
+         x = "Transmission type", 
+         y = "Miles/(US) gallon")
+print(g)
+```
+
+# Models
+
+## Simple Model
+
+```{r simple_fit}
+summary(fit)
+```
+
+## Model with all variables
+```{r fit_all}
+summary(fit_all)
+```
+
+## Model obtained with AIC
+```{r fit_step}
+summary(fit_step)
+```
+
+## Model with only `wt` and `hp`
+```{r fit_no_am_no_cyl}
+summary(fit_no_am_no_cyl)
+```
+
+## Final Model with `wt`, `hp` and their interaction
+```{r fit_final}
+summary(fit_final)
+```
+# Residuals
+
+```{r residuals}
+par(mfrow=c(2,2))
+plot(fit_final)
+```
